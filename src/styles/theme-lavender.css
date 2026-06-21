@@ -1,0 +1,260 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LAVENDER LIGHT THEME
+   Applied when body carries data-theme="lavender".
+   Override CSS custom-properties first, then fix hardcoded colours.
+═══════════════════════════════════════════════════════════════════ */
+
+body[data-theme="lavender"] {
+  /* ── Core palette ── */
+  --bg:     #f8f6ff;
+  --s:      rgba(120, 80, 200, .05);
+  --s2:     rgba(120, 80, 200, .09);
+  --border: rgba(120, 80, 200, .15);
+
+  --teal:      #0e8a6f;
+  --teal-dark: #0a6d57;
+  --teal-d:    rgba(14, 138, 111, .12);
+
+  --red:   #c82040;
+  --red-d: rgba(200, 32,  64, .10);
+
+  --amber:   #9a6000;
+  --amber-d: rgba(154, 96, 0, .10);
+
+  --blue: #5040b8;
+
+  --plum:      #8c3aaa;
+  --plum-dark: #6d2880;
+  --plum-d:    rgba(140, 58, 170, .12);
+
+  --text:        #2c1a2a;
+  --text-bright: #180c18;
+  --dim:    #8a6884;
+  --dimmer: #e0c8e0;
+
+  /* ── Body background ── */
+  background:
+    radial-gradient(900px 500px at 80% -5%,  rgba(200, 130, 220, .08), transparent 55%),
+    radial-gradient(700px 400px at -5% 100%, rgba(150, 120, 240, .06), transparent 55%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* ─── Links ──────────────────────────────────────────────────────── */
+body[data-theme="lavender"] a { color: var(--plum); }
+
+/* ─── Header gradient title ──────────────────────────────────────── */
+body[data-theme="lavender"] .hdr-left h1 {
+  background: linear-gradient(135deg, var(--plum), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ─── Theme toggle button (light-mode variant) ───────────────────── */
+body[data-theme="lavender"] .theme-toggle:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+
+/* ─── Input section ──────────────────────────────────────────────── */
+body[data-theme="lavender"] .input-section {
+  background: var(--s);
+}
+body[data-theme="lavender"] .smart-input {
+  background: rgba(160, 80, 140, .06);
+}
+body[data-theme="lavender"] .smart-input:focus {
+  border-color: var(--plum);
+  background: rgba(140, 58, 170, .07);
+  box-shadow: 0 0 0 3px rgba(140, 58, 170, .12);
+}
+
+/* ─── Classification badge ───────────────────────────────────────── */
+body[data-theme="lavender"] #classBadge          { background: rgba(160, 80, 140, .04); }
+body[data-theme="lavender"] #classBadge.path     { color: #c82040; }
+
+/* ─── API badge links ────────────────────────────────────────────── */
+body[data-theme="lavender"] .api-badge-link {
+  background:   rgba(120, 80, 200, .06);
+  border-color: rgba(120, 80, 200, .14);
+}
+body[data-theme="lavender"] .api-badge-link:hover {
+  background:   rgba(120, 80, 200, .12);
+  border-color: rgba(120, 80, 200, .22);
+  box-shadow: 0 2px 8px rgba(120, 80, 200, .12);
+}
+body[data-theme="lavender"] .api-group {
+  border-right-color: rgba(120, 80, 200, .15);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────── */
+body[data-theme="lavender"] .btn-sm {
+  background: rgba(160, 80, 140, .1);
+}
+body[data-theme="lavender"] .btn-sm:hover {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+body[data-theme="lavender"] .btn-copy {
+  background: linear-gradient(135deg, var(--plum), var(--plum-dark));
+}
+body[data-theme="lavender"] .btn-toggle-launch {
+  background: rgba(160, 80, 140, .08);
+}
+body[data-theme="lavender"] .btn-minimal {
+  border-color: var(--plum);
+  color: var(--plum);
+}
+body[data-theme="lavender"] .btn-minimal:hover {
+  background: var(--plum);
+  color: #fff;
+}
+
+/* ─── Data row dividers ──────────────────────────────────────────── */
+body[data-theme="lavender"] .dr {
+  border-bottom-color: rgba(160, 80, 140, .07);
+}
+
+/* ─── Source badges ──────────────────────────────────────────────── */
+body[data-theme="lavender"] .source-badge {
+  background: rgba(160, 80, 140, .1);
+}
+
+/* ─── DB launcher wrappers ───────────────────────────────────────── */
+body[data-theme="lavender"] .db-wrapper       { background: rgba(160, 80, 140, .04); }
+body[data-theme="lavender"] .db-wrapper:hover { background: rgba(160, 80, 140, .12); }
+
+/* ─── Zyg button ─────────────────────────────────────────────────── */
+body[data-theme="lavender"] .zyg-btn { background: rgba(160, 80, 140, .06); }
+
+/* ─── Chip states ────────────────────────────────────────────────── */
+body[data-theme="lavender"] .chip       { background: rgba(160, 80, 140, .04); }
+body[data-theme="lavender"] .chip:hover { background: rgba(160, 80, 140, .12); }
+
+/* ─── Tooltips ───────────────────────────────────────────────────── */
+body[data-theme="lavender"] .chip-tip,
+body[data-theme="lavender"] .tooltip-text {
+  background: #2a1030;
+  color: #f3e0f0;
+}
+body[data-theme="lavender"] .tippy-box[data-theme~='genelab'] {
+  background: #2a1030;
+  border-color: rgba(140, 58, 170, .25);
+}
+body[data-theme="lavender"] .tippy-box[data-theme~='genelab'][data-placement^='top']    > .tippy-arrow::before { border-top-color:    #2a1030; }
+body[data-theme="lavender"] .tippy-box[data-theme~='genelab'][data-placement^='bottom'] > .tippy-arrow::before { border-bottom-color: #2a1030; }
+body[data-theme="lavender"] .tippy-box[data-theme~='genelab'][data-placement^='left']   > .tippy-arrow::before { border-left-color:   #2a1030; }
+body[data-theme="lavender"] .tippy-box[data-theme~='genelab'][data-placement^='right']  > .tippy-arrow::before { border-right-color:  #2a1030; }
+
+/* ─── Disease / condition cards ──────────────────────────────────── */
+body[data-theme="lavender"] .disease-id-link {
+  color: var(--plum);
+  border-bottom-color: rgba(140, 58, 170, .35);
+}
+body[data-theme="lavender"] .disease-id-link:hover {
+  border-bottom-color: var(--plum);
+  color: var(--text);
+}
+body[data-theme="lavender"] .condition-card  { background: rgba(160, 80, 140, .03); }
+body[data-theme="lavender"] .disease-title   { color: var(--text); }
+body[data-theme="lavender"] .badge-gene      { color: var(--text); }
+
+/* ─── Footer ─────────────────────────────────────────────────────── */
+body[data-theme="lavender"] footer        { color: var(--plum); }
+body[data-theme="lavender"] .ver-badge    { background: var(--plum); color: #fff; }
+body[data-theme="lavender"] .see-all-link { color: var(--plum); }
+body[data-theme="lavender"] .match-tick   { color: var(--teal); }
+
+/* ─── Significance badges ────────────────────────────────────────── */
+body[data-theme="lavender"] .sig-lb { color: #0e8a6f; border-color: #0e8a6f; }
+
+/* ─── Evidence / validity labels ─────────────────────────────────── */
+body[data-theme="lavender"] .val-definitive,
+body[data-theme="lavender"] .val-high,
+body[data-theme="lavender"] .val-strong { color: #0e8a6f; }
+body[data-theme="lavender"] .bad-val    { color: #c82040; }
+
+/* ─── AI sidebar & chat ──────────────────────────────────────────── */
+body[data-theme="lavender"] .ai-chat-header    { color: var(--plum); }
+body[data-theme="lavender"] .ai-sidebar-header { color: var(--plum); }
+body[data-theme="lavender"] .ai-tab.active {
+  color: var(--plum);
+  border-bottom-color: var(--plum);
+  background: var(--plum-d);
+}
+body[data-theme="lavender"] .user-msg {
+  background:   var(--plum-d);
+  color:        var(--plum);
+  border-color: var(--plum);
+}
+body[data-theme="lavender"] .ai-conflict { color: #c82040; }
+
+/* ─── Bullet / bar graphs ────────────────────────────────────────── */
+body[data-theme="lavender"] .bullet-container      { background: rgba(160, 80, 140, .08); }
+body[data-theme="lavender"] .premium-bar-container { background: rgba(160, 80, 140, .08); }
+/* Marker lines: white stands out on dark; use a dark line on light bg */
+body[data-theme="lavender"] .bullet-marker,
+body[data-theme="lavender"] .premium-bar-tick {
+  background:  rgba(44, 26, 42, .7);
+  box-shadow: none;
+}
+
+/* REVEL spectrum — replace dark indeterminate zone with soft lavender */
+body[data-theme="lavender"] .revel-spectrum {
+  background: linear-gradient(to right,
+    #0e8a6f 0%,    #0e8a6f 0.3%,
+    #1a9080 0.3%,  #1a9080 1.6%,
+    #5ab8a8 1.6%,  #5ab8a8 18.3%,
+    #a8ddd4 18.3%, #a8ddd4 29%,
+    #c8a8c8 29%,   #c8a8c8 64.4%,
+    #9a6000 64.4%, #9a6000 77.3%,
+    #c82040 77.3%, #c82040 93.2%,
+    #9e0020 93.2%, #9e0020 100%);
+}
+
+/* ─── gnomAD population table ────────────────────────────────────── */
+body[data-theme="lavender"] .gnomad-table td      { border-bottom-color: rgba(160, 80, 140, .03); }
+body[data-theme="lavender"] .pop-group-details    { border-bottom-color: rgba(160, 80, 140, .05); }
+body[data-theme="lavender"] .pop-badge.none       { background: rgba(160, 80, 140, .05); }
+body[data-theme="lavender"] .pop-toggle           { background: rgba(160, 80, 140, .05); }
+body[data-theme="lavender"] .toggle-btn:hover:not(.active) { background: rgba(160, 80, 140, .05); }
+body[data-theme="lavender"] .toggle-btn.active {
+  background: var(--plum-d);
+  color: var(--plum);
+}
+
+/* ─── Transcript select ──────────────────────────────────────────── */
+body[data-theme="lavender"] .transcript-select {
+  background:   var(--bg);
+  border-color: rgba(120, 80, 200, .14);
+}
+
+/* ─── HPO autocomplete dropdown ─────────────────────────────────── */
+body[data-theme="lavender"] .dropdown {
+  background:  var(--bg);
+  box-shadow:  0 8px 32px rgba(100, 50, 150, .14);
+}
+body[data-theme="lavender"] .dropdown-section-header         { color: var(--plum); }
+body[data-theme="lavender"] .dropdown-section-header.typo-header { color: var(--amber); }
+body[data-theme="lavender"] .dropdown-item:hover,
+body[data-theme="lavender"] .dropdown-item.active            { background: rgba(140, 58, 170, .07); }
+
+/* ─── HPO pills ──────────────────────────────────────────────────── */
+body[data-theme="lavender"] .hpo-pill {
+  background:   rgba(140, 58, 170, .1);
+  border-color: var(--plum);
+}
+body[data-theme="lavender"] .hpo-pill .pill-id   { color: var(--plum); }
+body[data-theme="lavender"] .pill-accept-btn     { color: var(--teal); }
+
+/* ─── Conflicting significance badge ─────────────────────────────── */
+body[data-theme="lavender"] .sig-con {
+  background:   rgba(140, 58, 170, .12);
+  color:        #6030aa;
+  border-color: #6030aa;
+}
+
+/* ─── Light-mode options in select dropdowns ─────────────────────── */
+body[data-theme="lavender"] #apiSelector option { background: var(--bg); color: var(--text); }
+body[data-theme="lavender"] .smart-input::placeholder { color: var(--dim); opacity: .75; }

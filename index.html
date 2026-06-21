@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Variant Curation Engine – GG Lab</title>
+  <meta name="description" content="Dynamic ACMG/AMP variant classification engine for clinical geneticists.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="src/styles/main.css">
+  <link rel="stylesheet" href="src/styles/theme-lavender.css">
+  <!-- Vendored locally (libs/) so the app works fully offline and makes no CDN calls.
+       Versions: popper 2.11.8, tippy 6, pdf.js 3.4.120, html2canvas 1.4.1 -->
+  <link rel="stylesheet" href="libs/tippy.css"/>
+  <script src="libs/popper.min.js"></script>
+  <script src="libs/tippy.umd.min.js"></script>
+  <script src="libs/pdf.min.js"></script>
+  <script src="libs/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="src/styles/gemini_chat.css">
+  <style>
+    /* GitHub Pages minimal mode — hide all data display panels.
+       Elements remain in the DOM so ui.js populates them and
+       buildReportHtml() (app.js:1055) can read their innerText. */
+    .data-grid,
+    #splicePS1Card,
+    #maveDBCardContainer,
+    #domainAnnotationContainer,
+    #conditions-toggle-header,
+    #associated-conditions-wrapper,
+    .acmg-section,
+    #launchersSection { display: none !important; }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <header>
+      <div class="hdr-left">
+        <h1>🧬 Variant Curation Engine</h1>
+        <div class="sub">GG Laboratory · ACMG/AMP 2015 · Powered by REST APIs</div>
+      </div>
+      <div id="classBadge">— Awaiting Data —</div>
+    </header>
+
+    <div id="vcepBanner">
+      ⚠️ ClinGen VCEP Guidelines apply to <strong id="vcepGene"></strong>
+      — custom rules override standard ACMG thresholds.
+      <a id="vcepLink" href="#" target="_blank">View VCEP Rules →</a>
+    </div>
+
+    <div class="input-section">
+      <div class="input-grid">
+        <div class="input-block">
+          <label>Variant (HGVS or hg38 coords)</label>
+          <input type="text" id="rawInput" class="smart-input" placeholder="NM_000059.4:c.5266dupC  or  12 51662848 C T"
+            oninput="handleInput()">
+        </div>
+        <div class="input-block">
+          <label>Gene Symbol (for VCEP check)</label>
+          <input type="text" id="geneInput" class="smart-input" placeholder="e.g. BRCA2" oninput="handleGeneInput()">
+        </div>
+        <div class="input-block">
+          <label>HPO Phenotypes (autocomplete on each term)</label>
+          <div class="autocomplete-wrap">
+            <input
+              type="text"
+              id="hpoInput"
+              class="smart-input"
+              placeholder="e.g. Seizure, Hypotonia, Intellectual disability…"
+              autocomplete="off"
+            />
+            <div class="dropdown" id="hpoDropdown"></div>
+          </div>
+          <div class="pills-wrap" id="hpoPills"></div>
+        </div>
+      </div>
+      <div class="api-toggle" style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+        <label style="font-size: 0.72rem; font-weight: 600; color: var(--dim); text-transform: uppercase;">Primary API
+          Mode:</label>
+        <select id="apiSelector" class="smart-input" style="width: auto; padding: 4px 8px; font-size: 0.75rem;"
+          onchange="localStorage.setItem('primaryApiMode', this.value)">
+          <option value="VV">VariantValidator (Auto-Fallback to VEP)</option>
+          <option value="ENSEMBL">Ensembl VEP (Forced Backup)</option>
+          <option value="CLINGEN">ClinGen (Forced Backup)</option>
+        </select>
+        <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Switch theme" style="margin-left: auto;">
+          <span id="themeToggleIcon">🌸</span><span id="themeToggleLabel">Lavender</span>
+        </button>
+      </div>
+      <div class="status-row">
+        <div id="statusMsg">Enter a variant, or just a gene + phenotypes for gene-only analysis.</div>
+        <div id="api-badges-container" class="api-badges-container"></div>
+      </div>
+    </div>
+
+    <!-- ACMG MATRIX -->
+
+    <!-- DATA CARDS -->
+    <div class="data-grid">
+      <div class="data-card variant-annot-card">
+        <h3>🧬 Variant Annotation</h3>
+        <div class="dr"><span class="dk">Gene</span><span class="dv"><span id="dGene">—</span> <a id="clingenSearchLink"
+              target="_blank"
+              style="margin-left:8px;font-size:0.65rem;color:var(--amber);text-decoration:none;display:none;">ClinGen
+              VCEP Check ↗</a></span></div>
+        <div class="dr"><span class="dk">Transcript (MANE)</span><span class="dv" id="eManeTranscript">—</span></div>
+        <div class="dr" id="rowTranscriptPicker" style="display:none">
+          <span class="dk" style="font-size:0.7rem">↪ All Transcripts</span>
+          <span class="dv" style="text-align:right">
+            <select id="transcriptDropdown" class="transcript-select"></select>
+            <span id="transcriptDropdownDetail" style="font-size:0.65rem; color:var(--dim); display:block; margin-top:2px;"></span>
+          </span>
+        </div>
+        <div class="dr"><span class="dk">HGVS c.</span><span class="dv" id="dHgvs">—</span></div>
+        <div class="dr" id="rowMutalyzer" style="display:none">
+          <span class="dk" style="font-size:0.7rem">↪ Genomic HGVS</span>
+          <span class="dv" id="eMutalyzerHgvs" style="font-size:0.75rem; color:var(--dim)">—</span>
+        </div>
+        <div class="dr"><span class="dk">HGVS p.</span><span class="dv" id="dProtein">—</span></div>
+        <div class="dr"><span class="dk">hg38 (VCF)</span><span class="dv" id="dHg38">—</span></div>
+        <div class="dr"><span class="dk">hg19 (VCF)</span><span class="dv" id="dHg19">—</span></div>
+        <div class="dr"><span class="dk">Exon / Intron</span><span class="dv" id="eExon">—</span></div>
+        <div class="dr"><span class="dk">dbSNP rsID</span><span class="dv" id="eRsId">—</span></div>
+        <div class="dr"><span class="dk">ClinGen CA ID</span><span class="dv" id="eCAId">—</span></div>
+        <div class="dr"><span class="dk">VEP Consequence</span><span class="dv" id="eConsequence">—</span></div>
+      </div>
+
+      <div class="data-card gene-patho-card">
+        <div class="patho-header-v81">
+          <h3>🧬 GENE PATHOGENICITY</h3>
+        </div>
+
+        <!-- ClinGen Gene-Disease Validity -->
+        <div id="eGeneValidityCard" style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed rgba(255,255,255,0.1);">
+          <div style="font-size:0.72rem; color:var(--dim); font-weight:600; margin-bottom:4px;">ClinGen Gene-Disease Validity (Definitive only)</div>
+          <div id="eGeneValidityBody" style="color:var(--dim); font-size:0.76rem;">—</div>
+        </div>
+
+        <!-- ClinGen Dosage Sensitivity -->
+        <div class="dosage-row-v81">
+          <span class="dk">ClinGen Haploinsufficiency</span>
+          <span class="dv" id="eHaploScore">—</span>
+        </div>
+        <div class="dosage-row-v81">
+          <span class="dk">ClinGen Triplosensitivity</span>
+          <span class="dv" id="eTriploScore">—</span>
+        </div>
+        <div id="eDosageSource" style="font-size:0.65rem; color:var(--text-dim); text-align:right; padding-top:2px;"></div>
+
+        <!-- Gene Constraint -->
+        <div title="gnomad v4 (hg38) metrics: pLI | LOEUF | OE Mis" style="border-top:1px dashed rgba(255,255,255,0.1); margin-top:8px; padding-top:8px;">
+          <div style="font-size: 0.72rem; color: var(--dim); font-weight: 600; margin-bottom: 8px;">Gene Constraint (hg38)</div>
+          <div id="gnomadGeneConstraint">
+            <div style="text-align: center; color: var(--dim); padding: 10px;">— Awaiting Data —</div>
+          </div>
+        </div>
+
+        <!-- Regional Missense -->
+        <div class="regional-row-v81" id="rowRegional">
+          <span class="dk" id="labelRegional" style="font-size: 0.72rem;">Regional Missense (hg19)</span>
+          <div style="text-align: right;">
+            <span id="eRegionalOE" class="dv" style="font-weight: 800; font-size: 0.85rem;">—</span>
+            <div id="eRegionalRange" style="font-size: 0.65rem; color: var(--dim);">Interval: —</div>
+            <div id="eRegionalPValue" style="font-size: 0.65rem; color: var(--dim);"></div>
+          </div>
+        </div>
+
+        <div class="dr" style="border-top:1px dashed rgba(255,255,255,0.1); margin-top:8px; padding-top:8px;">
+          <span class="dk">Inheritance Mode</span><span class="dv" id="eInheritance">—</span>
+        </div>
+
+        <!-- GeneReviews — temporarily hidden, code intact -->
+        <div id="eGeneReviewsCard" style="display:none; border-top:1px dashed rgba(255,255,255,0.1); margin-top:8px; padding-top:8px;">
+          <div style="font-size:0.72rem; color:var(--dim); font-weight:600; margin-bottom:4px;">GeneReviews®</div>
+          <div id="eGeneReviewsBody" style="color:var(--dim); font-size:0.76rem;">—</div>
+        </div>
+
+        <!-- Curation Concordance — hidden -->
+        <div id="eCurationSupportCard" style="display:none;">
+          <div style="font-size:0.72rem; color:var(--dim); font-weight:600; margin-bottom:4px;">Curation Concordance</div>
+          <div id="eCurationSupportBody" style="color:var(--dim); font-size:0.76rem;">—</div>
+        </div>
+      </div>
+
+
+      <div class="data-card pop-freq-card" id="popFreqCard">
+        <div
+          style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+          <h3 style="border:none; margin:0; padding:0;">📊 Population Frequency</h3>
+          <div class="pop-toggle">
+            <button class="toggle-btn active" onclick="setViewMode('total')">Total</button>
+            <button class="toggle-btn" onclick="setViewMode('exome')">Exomes</button>
+            <button class="toggle-btn" onclick="setViewMode('genome')">Genomes</button>
+          </div>
+        </div>
+
+        <!-- Grpmax Table -->
+        <table class="gnomad-table grpmax-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Exomes</th>
+              <th>Genomes</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="dk">Filters <span class="help-icon" title="gnomAD filter status">?</span></td>
+              <td id="exomeFilterBadge"></td>
+              <td id="genomeFilterBadge"></td>
+              <td id="totalFilterBadge"></td>
+            </tr>
+            <tr>
+              <td class="dk">Grpmax AF <span class="help-icon" title="Grpmax Filtering AF (95% confidence)">?</span>
+              </td>
+              <td id="exomePopmax">—</td>
+              <td id="genomePopmax">—</td>
+              <td id="mvPopmax" class="bold-total">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Population Breakdown -->
+        <div id="populationBreakdown" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- BS2 decision-support panel (gnomAD-derived; rendered by renderBS2Panel) -->
+      <div class="data-card bs2-card" id="bs2Card" style="display:none;">
+        <h3>🧪 BS2 — Benign Observation (gnomAD)</h3>
+        <div id="bs2Context"
+          style="font-size:0.72rem; color:var(--dim); margin-bottom:8px; line-height:1.5;">—</div>
+
+        <!-- Pathway A: directly observed healthy homozygote / hemizygote -->
+        <div id="bs2PathwayA" style="margin-bottom:10px;"></div>
+
+        <!-- Pathway B: inferred compound-het — automatic ClinVar-P/LP co-occurrence screen -->
+        <div style="border-top:1px dashed rgba(255,255,255,0.12); margin-top:6px; padding-top:8px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+            <div class="dk" style="font-size:0.72rem;">
+              Pathway B — inferred compound-het <span style="color:var(--dim);">(auto-screens ClinVar P/LP × gnomAD v2 co-occurrence)</span>
+            </div>
+            <button id="bs2ScreenBtn" onclick="screenBS2Cooccurrence(window.currentSearchGen())"
+              style="background:var(--teal); border:none; border-radius:4px; color:#04231d; font-weight:700; padding:5px 10px; font-size:0.72rem; cursor:pointer;">🔍 Screen ClinVar P/LP</button>
+          </div>
+          <div id="bs2PathwayB" style="margin-top:8px;"></div>
+        </div>
+
+        <div
+          style="margin-top:10px; font-size:0.62rem; color:var(--amber); font-weight:700; line-height:1.4;">
+          ⚠ Decision support only — every verdict requires expert review and is NOT auto-applied to the ACMG
+          matrix. Toggle the BS2 chip manually if you concur.
+        </div>
+      </div>
+
+      <div class="data-card in-silico-card">
+        <h3>💻 In Silico Predictions</h3>
+        <div class="dr"><span class="dk">REVEL Score</span><span class="dv" id="mvRevel">—</span></div>
+        <div class="dr"><span class="dk">AlphaMissense</span><span class="dv" id="mvAlphaMissense">—</span></div>
+        <div class="dr" style="margin-bottom:2px;"><span class="dk">SpliceAI Max Δ</span><span class="dv"
+            id="mvSpliceAI">—</span></div>
+        <div id="spliceAiDetailed"
+          style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px; font-size:0.7rem; background:rgba(0,0,0,0.1); padding:6px; border-radius:4px;">
+          <div style="display:flex; justify-content:space-between"><span>AG:</span><b id="mvSpliceAI_AG">—</b></div>
+          <div style="display:flex; justify-content:space-between"><span>AL:</span><b id="mvSpliceAI_AL">—</b></div>
+          <div style="display:flex; justify-content:space-between"><span>DG:</span><b id="mvSpliceAI_DG">—</b></div>
+          <div style="display:flex; justify-content:space-between"><span>DL:</span><b id="mvSpliceAI_DL">—</b></div>
+        </div>
+        <div id="spliceAiConsequence"
+          style="font-size:0.7rem; font-weight:800; color:var(--red); margin-top:4px; text-align:center;"></div>
+        <div class="dr"><span class="dk">Auto-suggested codes</span><span class="dv" id="mvSuggest"
+            style="font-family:Inter;color:var(--amber);">—</span></div>
+        <div style="font-size:0.62rem;color:var(--dim);text-align:right;margin-top:-4px;">Suggestions based on standard
+          ACMG/REVEL thresholds.</div>
+      </div>
+
+      <!-- ClinVar Variant Distribution — spans 4 columns -->
+      <div class="data-card variant-dist-card" id="variantDistributionContainer"></div>
+
+      <!-- Protein Variant Viewer — row 2 in the data grid (between scores and annotation) -->
+      <div id="codonViewerContainer" class="codon-viewer-card" style="display:none;"></div>
+
+      <div class="data-card clinvar-summary-card">
+        <h3>🏥 ClinVar Summary</h3>
+        <div class="dr"><span class="dk">Classification</span><span class="dv" id="cvSig">—</span></div>
+        <div class="dr"><span class="dk">Review Status</span><span class="dv" id="cvStatus">—</span></div>
+        <div class="dr"><span class="dk">Star Rating</span><span class="dv" id="cvStars">—</span></div>
+        <div class="dr"><span class="dk">Submissions</span><span class="dv" id="cvSubs">—</span></div>
+        <div class="dr"><span class="dk">Accession</span><span class="dv" id="cvAcc">—</span></div>
+        <div class="dr" id="cvEvidenceRepoRow" style="display:none;"><span class="dk">Evidence Repository</span><span class="dv" id="cvEvidenceRepo">—</span></div>
+        <div id="cvEvidenceFlags" style="display:none; margin-top:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:8px; width:100%;">
+          <div style="font-size:.68rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Submitter Evidence</div>
+          <div class="dr" id="cvFlagDeNovo"><span class="dk">De novo</span><span class="dv">—</span></div>
+          <div class="dr" id="cvFlagFunctional"><span class="dk">Functional data</span><span class="dv">—</span></div>
+          <div class="dr" id="cvFlagSegregation"><span class="dk">Co-segregation</span><span class="dv">—</span></div>
+        </div>
+        <div id="cvAltBlock" style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; width:100%;">
+          <div id="cvAltLabelText"></div>
+          <div id="cvAltCodon" style="width:100%;">—</div>
+        </div>
+        <div id="cvCodonWrapper" class="dr" style="display:none;">
+           <span class="dk">Codon</span>
+           <span class="dv" id="cvCodonText">—</span>
+        </div>
+        <div style="margin-top:8px;font-size:.72rem;color:var(--dim);">Via NCBI E-utilities · Authenticated</div>
+      </div>
+
+      <div class="data-card literature-card">
+        <h3>📚 Literature Review</h3>
+        <div class="dr"><span class="dk">LitVar 2.0 Explicit Matches</span><span class="dv" id="pLitVarMatches">—</span>
+        </div>
+        <div class="dr" id="rowPubMedMultiTx" style="display:none">
+          <span class="dk" style="font-size:0.72rem">PubMed (All Transcripts)</span>
+          <span class="dv" id="pMultiTxTotal">—</span>
+        </div>
+        <div id="pMultiTxBreakdown" style="display:none; padding:4px 0 2px 0;"></div>
+        <div id="pPhenoBreakdown" style="margin-top:6px;"></div>
+
+        <h3 style="margin-top:20px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08);">🧬 Phenotype &amp;
+          Gene Match</h3>
+        <div class="dr"><span class="dk">Match Score</span><span class="dv" id="pScore">—</span></div>
+        <div class="dr"><span class="dk">Matched Terms</span><span class="dv" id="pTerms">—</span></div>
+        <div class="dr" id="pOmimSynopsisRow" style="display:none;"><span class="dk">OMIM Synopsis</span><span class="dv" id="pOmimSynopsis">—</span></div>
+        <div class="dr" id="pPhenoFitRow" style="display:none;"><span class="dk">Phenotype Fit (LR)</span><span class="dv" id="pPhenoFit">—</span></div>
+      </div>
+
+      <div class="data-card clinvar-evidence-card" id="clinvarEvidenceCard" style="display:none;">
+        <h3>💬 Submitter Evidence Comments</h3>
+        <div style="font-size:.72rem;color:var(--dim);margin-bottom:12px;">
+          Free-text submitter comments that mention functional data, de novo origin, or co-segregation.
+          Relevant sentences are highlighted. <span style="color:var(--amber);">&#9646;</span> Functional &nbsp;
+          <span style="color:var(--red);">&#9646;</span> De novo &nbsp;
+          <span style="color:var(--teal);">&#9646;</span> Co-segregation
+        </div>
+        <div id="clinvarEvidenceContent"></div>
+      </div>
+    </div>
+
+    <!-- Splice Variant PS1 Audit — full-width, outside the grid, only shows for splice variants -->
+    <div id="splicePS1Card" style="display:none; margin-top:16px; background:linear-gradient(135deg, rgba(245,158,11,0.05), rgba(46,229,157,0.03)); border:1px solid var(--border); border-left:4px solid var(--amber); border-radius:8px; padding:16px;">
+      <h2 style="margin:0 0 12px 0; font-size:1.05rem; color:var(--text-bright); display:flex; align-items:center; gap:8px;">
+        <span style="font-size:1.3rem;">🧬</span>
+        Splice Variant Analysis — PS1 Audit
+        <span style="font-size:0.65rem; font-weight:400; color:var(--dim); letter-spacing:0.5px; text-transform:uppercase; margin-left:8px;">3-Phase Workflow</span>
+      </h2>
+      <div id="splicePS1Content" style="width:100%;">—</div>
+    </div>
+
+    <!-- MaveDB and Domain Annotation — full-width, outside the grid -->
+    <div id="maveDBCardContainer" style="display:none; margin-top:12px;"></div>
+    <div id="domainAnnotationContainer" style="display:none; margin-top:12px;"></div>
+
+    <div id="conditions-toggle-header" class="section-header" style="display:none;">
+      <span id="conditions-count-text">Gene-Disease Associations</span>
+      <span id="conditions-loading" style="display:none;">(Loading...)</span>
+    </div>
+    <div id="associated-conditions-wrapper">
+      <div id="associated-conditions-container"></div>
+    </div>
+
+    <div class="acmg-section" style="display: none;">
+      <div class="sec-hdr">
+        <h2>⚖️ ACMG/AMP Evidence Matrix — Click to Toggle</h2>
+        <button class="btn-sm" onclick="clearACMG()">Clear All</button>
+      </div>
+      <div class="acmg-group" id="acmgMatrix"></div>
+    </div>
+
+    <!-- DB LAUNCHERS -->
+    <div id="launchersSection">
+      <div class="launch-hdr" style="display:flex; gap:10px; margin-bottom:12px;">
+        <button id="btnLaunchAll" class="btn-toggle-launch" onclick="launchAll()"
+          title="Launch all external databases sequentially">
+          <span class="btn-icon">✦</span> Launch All
+        </button>
+        <button id="btnLaunchSel" class="btn-toggle-launch" onclick="launchSelected()"
+          title="Launch only selected databases">
+          <span class="btn-icon">✔</span> Launch Selected
+        </button>
+      </div>
+      <div id="popupWarning" class="warning-box">⚠️ POPUPS BLOCKED! Please allow popups.</div>
+      <div class="db-grid" id="dbGrid"></div>
+    </div>
+
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); display: flex; gap: 10px;">
+      <button class="btn-main btn-copy" id="btnCopyReport" style="flex: 1; justify-content:center; height:48px;"
+        onclick="copyReport()" title="Export clinical findings to analysis summary"><span class="btn-icon"
+          style="color: white">📋</span> Copy To Analysis Summary</button>
+      <!-- Save Report to Folder HIDDEN per request (2026-06-08): display:none on the button.
+           Nothing deleted — saveReportToFolder() stays intact. Re-enable by removing display:none. -->
+      <button class="btn-main" id="btnSaveReport" style="display:none; flex: 1; justify-content:center; height:48px;"
+        onclick="saveReportToFolder()" title="Save the report as an .html file to a folder you choose"><span
+          class="btn-icon">💾</span> Save Report to Folder</button>
+      <!-- IEM AI-prompt group HIDDEN per request (2026-06-08): display:none on this wrapper.
+           Nothing deleted — copyAIPrompt(), the IEM template, and the edit button are all intact.
+           Re-enable by changing display:none back to display:flex. -->
+      <div style="flex:1; display:none; gap:2px;">
+        <button class="btn-main" id="btnCopyAIPrompt" style="flex:1; justify-content:center; height:48px;"
+          onclick="copyAIPrompt()" title="Copy AI-ready standardized prompt for IEM report"><span
+            class="btn-icon">🤖</span> Copy AI Prompt to IEM Report</button>
+        <button id="btnEditPromptIEM" onclick="openPromptEditor('iem')"
+          title="Edit IEM prompt template"
+          style="height:48px; width:34px; padding:0; flex-shrink:0; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:var(--r); cursor:pointer; font-size:13px; color:var(--dim); transition:color .15s,border-color .15s;">✏️</button>
+      </div>
+      <div style="flex:1; display:flex; gap:2px;">
+        <button id="btnCopyAIPromptGG" class="btn-main" style="flex:1; justify-content:center; height:48px;"
+          onclick="copyAIPromptGG()" title="Copy few-shot prompt for GG Report style">
+          <span class="btn-icon">🤖</span> Copy AI Prompt for GG Report
+        </button>
+        <button id="btnEditPromptGG" onclick="openPromptEditor('gg')"
+          title="Edit GG prompt template"
+          style="height:48px; width:34px; padding:0; flex-shrink:0; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:var(--r); cursor:pointer; font-size:13px; color:var(--dim); transition:color .15s,border-color .15s;">✏️</button>
+      </div>
+      <div style="flex:1; display:flex; gap:2px;">
+        <button id="btnUpdateReport" class="btn-main" style="flex:1; justify-content:center; height:48px;"
+          onclick="openUpdateReportModal()" title="Update an old report with new data">
+          <span class="btn-icon">🔄</span> Update / double check reports
+        </button>
+        <button id="btnEditPromptUpdate" onclick="openPromptEditor('update')"
+          title="Edit update prompt template"
+          style="height:48px; width:34px; padding:0; flex-shrink:0; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:var(--r); cursor:pointer; font-size:13px; color:var(--dim); transition:color .15s,border-color .15s;">✏️</button>
+      </div>
+    </div>
+
+    <footer>
+      <div style="display:flex; flex-direction:column; gap:4px; color:var(--teal); font-weight:600;">
+        <div id="apiStatus">APIs: VariantValidator (hg38/hg19) | Ensembl Rel 115 | MyVariant.info | NCBI E-utils
+          | Monarch HPO</div>
+        <div id="versionTraceability" style="font-size:0.65rem;">
+          ClinGen Dosage: 2026-04-06 Release |
+          gnomAD: v4.1.1 (hg38) / v2.1.1 (hg19) |
+          ClinVar: Mar 2026 Archive
+        </div>
+      </div>
+      <span class="ver-badge">V81</span>
+    </footer>
+  </div>
+
+  <!-- MODULAR SCRIPTS -->
+  <div id="zygosityModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.7); backdrop-filter:blur(12px); z-index:2000; justify-content:center; align-items:center;">
+    <div
+      style="background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:32px; width:440px; max-width:90%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5);">
+      <h3 style="margin-bottom:24px; font-size:1.2rem; font-weight:800; color:var(--text); letter-spacing:.03em;">Select
+        Zygosity:</h3>
+      <div style="display:grid; grid-template-columns:1fr; gap:14px;">
+        <button class="btn-main zyg-btn" onclick="resolveZygosity('Heterozygous')">Heterozygous</button>
+        <button class="btn-main zyg-btn" onclick="resolveZygosity('Homozygous')">Homozygous</button>
+        <button class="btn-main zyg-btn" onclick="resolveZygosity('Hemizygous')">Hemizygous</button>
+        <button class="btn-sm" style="margin-top:12px; height:40px; font-weight:700;"
+          onclick="resolveZygosity(null)">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Template Editor Modal -->
+  <div id="promptEditorModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.75); backdrop-filter:blur(12px); z-index:9999; justify-content:center; align-items:center;">
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:24px; width:92%; max-width:760px; max-height:92vh; display:flex; flex-direction:column; gap:12px; box-shadow:0 12px 48px rgba(0,0,0,.6);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <h3 id="promptEditorTitle" style="margin:0; font-size:1.05rem; font-weight:800; color:var(--text-bright);">Edit Prompt Template</h3>
+        <button onclick="closePromptEditor()"
+          style="background:none; border:none; color:var(--dim); cursor:pointer; font-size:1.3rem; line-height:1; padding:4px 6px; border-radius:4px;"
+          onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--dim)'">✕</button>
+      </div>
+      <p id="promptEditorHint"
+        style="margin:0; font-size:0.78rem; color:var(--dim); line-height:1.5; padding:8px 10px; background:rgba(255,255,255,0.04); border-radius:6px; border-left:3px solid var(--teal);"></p>
+      <textarea id="promptEditorTextarea" spellcheck="false"
+        style="flex:1; min-height:380px; max-height:58vh; resize:vertical; width:100%; box-sizing:border-box; padding:12px; border-radius:6px; background:rgba(0,0,0,.3); color:var(--text-bright); border:1px solid var(--border); font-family:ui-monospace,'Cascadia Code','Menlo',monospace; font-size:0.73rem; line-height:1.55; tab-size:2;"></textarea>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <button onclick="resetCurrentTemplate()"
+          style="padding:8px 14px; background:transparent; border:1px solid var(--border); color:var(--dim); border-radius:6px; cursor:pointer; font-size:0.8rem; font-family:inherit;"
+          onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--dim)'">↩ Reset to Default</button>
+        <div style="display:flex; gap:8px;">
+          <button onclick="closePromptEditor()"
+            style="padding:8px 18px; background:transparent; border:1px solid var(--border); color:var(--text-bright); border-radius:6px; cursor:pointer; font-family:inherit;">Cancel</button>
+          <button onclick="saveCurrentTemplate()"
+            style="padding:8px 22px; background:var(--teal); border:none; color:#000; font-weight:700; border-radius:6px; cursor:pointer; font-family:inherit;">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="updateReportModal" class="modal-overlay"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal-content"
+      style="background:var(--bg); padding:20px; border-radius:8px; width:90%; max-width:600px; border: 1px solid var(--border);">
+      <h3 style="margin-top:0; color:var(--text-bright);">🔄 Update Old Variant Interpretation</h3>
+      <p style="font-size:0.85rem; color:var(--dim); margin-bottom:12px;">Paste the old variant interpretation below.
+        The AI will cross-reference it with the newly pulled data to update outdated metrics (e.g., gnomAD, ClinVar) and
+        fix grammar.</p>
+
+      <textarea id="oldReportTextarea" rows="10" placeholder="Paste old report here..."
+        style="width:100%; box-sizing:border-box; padding:10px; border-radius:4px; background:rgba(0,0,0,0.2); color:var(--text-bright); border:1px solid var(--border); font-family:inherit; resize:vertical; margin-bottom:16px;"></textarea>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button onclick="closeUpdateReportModal()"
+          style="padding:8px 16px; background:transparent; border:1px solid var(--border); color:var(--text-bright); border-radius:4px; cursor:pointer;">Cancel</button>
+        <button onclick="generateUpdateAIPrompt()"
+          style="padding:8px 16px; background:var(--teal); border:none; color:#000; font-weight:bold; border-radius:4px; cursor:pointer;">Generate
+          Prompt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ClinVar gene index is fetched over HTTP from data/clinvar_gene_index.json (see loadClinVarIndex
+       in src/api.js). The bundled .js global was a file:// optimisation, not needed on GitHub Pages. -->
+  <script src="src/clingen_local_data.js"></script>
+  <script src="src/config.js"></script>
+  <script src="src/api_status.js"></script>
+  <script src="src/codon-viewer.js"></script>
+  <script src="src/ui.js"></script>
+
+  <script src="src/validation.js"></script>
+  <!-- HPO phenotype-fit scorer (pure module; load before omim_local.js + app.js so window.HpoFit exists) -->
+  <script src="src/hpo_phenotype_fit.js"></script>
+  <script src="src/omim_local.js"></script>
+  <script src="src/api.js"></script>
+  <script src="src/hpo_autocomplete.js"></script>
+  <!-- BS2 decision-support (pure module; must load before app.js so window.BS2 exists) -->
+  <script src="src/bs2_cooccurrence.js"></script>
+  <script src="src/app.js"></script>
+
+
+
+  <!-- Floating Gemini Toggle Button -->
+  <button id="geminiToggleBtn" onclick="toggleGeminiSidebar()">✨</button>
+
+  <!-- Gemini AI Sidebar -->
+  <div id="geminiSidebar" class="ai-sidebar">
+    <div class="gemini-header">
+      <span>Gemini Assistant</span>
+      <button class="gemini-close-btn" onclick="toggleGeminiSidebar()">&times;</button>
+    </div>
+    <div id="geminiChatHistory">
+      <div class="gemini-msg gemini-msg-ai">Hello! I'm Gemini. How can I assist you today?</div>
+    </div>
+    <div class="gemini-input-area">
+      <input type="text" id="geminiInput" placeholder="Type a message...">
+      <button id="geminiSubmitBtn" onclick="handleGeminiSubmit()">Send</button>
+    </div>
+  </div>
+
+  <script src="src/gemini_chat.js"></script>
+</body>
+
+</html>

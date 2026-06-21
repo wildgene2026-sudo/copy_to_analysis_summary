@@ -1,0 +1,53 @@
+# Environment variables (credentials — NEVER commit these)
+.env
+.env.local
+.env.*.local
+
+# Build & dependencies (can be regenerated via npm install / npm run build)
+dist/
+build/
+node_modules/
+
+# Backups & logs
+_backup_*
+_archive/
+*.log
+worktree-manager*.log
+
+# Compiled Go binaries (built in ../lab-variant-search-go; never belong here)
+/lab-variant-search
+/lab-variant-search.exe
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# Local editor / harness config (machine-specific absolute paths)
+.claude/
+
+# Large ClinVar data excluded — only fed the hidden gene-distribution chart, not
+# the Analysis Summary (which uses live NCBI ClinVar). Saves a 19 MB fetch per search.
+data/codon/
+data/clinvar_gene_index.js
+data/clinvar_gene_index.json
+
+# OMIM data — copyright Johns Hopkins, NOT redistributable in a public repo
+# (https://omim.org/help/agreement). OMIM section degrades gracefully without it.
+data/omim/
+
+# HPO build inputs (85 MB) — never fetched by the client. The browser uses the
+# live JAX API for autocomplete and the small data/hpo/ files for phenotype-fit.
+hpo_data/
+
+# Dev/local-only files not needed for GitHub Pages
+server/
+scripts/
+vite.config.js
+dev.sh
+package.json
+package-lock.json
+*.command
