@@ -4648,10 +4648,17 @@ function _parseCsvLine(line) {
 function _loadClingenValidityCsv() {
   if (_clingenValidityCsvPromise) return _clingenValidityCsvPromise;
   // Primary: Go helper (/api/clingen-validity) — direct fetch from the user's machine, no CORS issue.
-  // Fallback: CodeTabs proxy — used when the helper isn't running (e.g. plain browser open without binary).
+  // Fallback 1: direct ClinGen URL — works if ClinGen sends CORS headers (confirmed working 2026-06-21).
+  // Fallback 2: corsproxy.io — reliable CORS proxy; CodeTabs returns 400 for this domain.
   // Rule 11: fetchWithTimeout for fire-and-forget remote calls.
   const helperUrl  = '/api/clingen-validity';
-  const proxyUrl   = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent('https://search.clinicalgenome.org/kb/gene-validity/download')}`;
+  const directUrl  = 'https://search.clinicalgenome.org/kb/gene-validity/download';
+  const proxyUrl   = `https://corsproxy.io/?url=${encodeURIComponent(directUrl)}`;
+
+  const isCsv = res => {
+    const ct = res.headers.get('content-type') || '';
+    return !ct.includes('text/html') && !ct.includes('application/json');
+  };
 
   _clingenValidityCsvPromise = fetchWithTimeout(helperUrl, {}, 40000)
     .then(res => {
@@ -4661,9 +4668,17 @@ function _loadClingenValidityCsv() {
       return res.text();
     })
     .catch(() => {
-      console.warn('[GeneValidity] Go helper unavailable — falling back to CodeTabs proxy');
+      // Try direct URL first — no proxy overhead if ClinGen allows CORS.
+      return fetchWithTimeout(directUrl, {}, 40000)
+        .then(res => {
+          if (!res.ok || !isCsv(res)) throw new Error(`direct HTTP ${res.status}`);
+          return res.text();
+        });
+    })
+    .catch(() => {
+      console.warn('[GeneValidity] direct fetch failed — trying corsproxy.io');
       return fetchWithTimeout(proxyUrl, {}, 40000)
-        .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); });
+        .then(res => { if (!res.ok) throw new Error(`proxy HTTP ${res.status}`); return res.text(); });
     })
     .catch(err => {
       console.warn('[GeneValidity] CSV load failed:', err.message);
